@@ -1,0 +1,403 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap");
+
+/* ---- Design tokens -------------------------------------------------
+   Concept: a small team's ticket board — cards read like torn ticket
+   stubs, with a numbered stub and a priority-coded spine.
+   Palette: cool slate surface, ink-navy header, muted teal brand accent,
+   warm amber/red reserved only for priority signal (so color carries
+   real meaning, not decoration).
+------------------------------------------------------------------- */
+:root {
+  --ink: #171b26;
+  --ink-soft: #4a5164;
+  --surface: #eef1f6;
+  --surface-card: #ffffff;
+  --line: #dbe0ea;
+  --brand: #2f7a6b;
+  --brand-soft: #e4f1ee;
+  --p-low: #8892a6;
+  --p-medium: #4b6bfb;
+  --p-high: #e08a3c;
+  --p-urgent: #d64545;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Header ---- */
+.app-header {
+  background: var(--ink);
+  color: #f4f6fb;
+  padding: 18px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-header h1 {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+.app-header .tagline {
+  font-size: 0.8rem;
+  color: #9aa3ba;
+  margin-top: 2px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pill-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f6fb;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.pill-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* ---- AI command bar ---- */
+.command-bar {
+  padding: 18px 28px;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--line);
+}
+
+.command-form {
+  display: flex;
+  gap: 10px;
+  max-width: 880px;
+}
+
+.command-input {
+  flex: 1;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.command-input:focus {
+  border-color: var(--brand);
+}
+
+.command-submit {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.command-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.command-hint {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.command-feedback {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  max-width: 880px;
+}
+.command-feedback.ok {
+  background: var(--brand-soft);
+  color: #205448;
+}
+.command-feedback.err {
+  background: #fbe7e7;
+  color: #93231f;
+}
+
+/* ---- Board ---- */
+.board {
+  flex: 1;
+  padding: 24px 28px 40px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
+}
+
+.column {
+  background: transparent;
+}
+
+.column-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+
+.column-header h2 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.column-count {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.column-empty {
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* ---- Ticket-stub task card ---- */
+.task-card {
+  position: relative;
+  background: var(--surface-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  padding: 14px 16px 14px 18px;
+  box-shadow: 0 1px 2px rgba(23, 27, 38, 0.04);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.task-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(23, 27, 38, 0.08);
+}
+
+.task-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--priority-color, var(--p-medium));
+}
+
+.task-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.task-title {
+  font-weight: 600;
+  font-size: 0.94rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.task-id {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.task-desc {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.task-due {
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f1f3f8;
+  color: var(--ink-soft);
+}
+.task-due.soon {
+  background: #fdf1e2;
+  color: #8a5a17;
+}
+.task-due.overdue {
+  background: #fbe7e7;
+  color: #93231f;
+}
+
+.task-assignee {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.status-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.status-actions button {
+  flex: 1;
+  font-size: 0.7rem;
+  padding: 5px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.status-actions button:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ---- Login ---- */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+}
+
+.login-card {
+  background: var(--surface-card);
+  padding: 36px 32px;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.login-card h1 {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  margin: 0 0 4px;
+}
+
+.login-card p {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0 0 22px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--line);
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  outline: none;
+}
+.login-card input:focus {
+  border-color: var(--brand);
+}
+
+.login-card button {
+  width: 100%;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-status {
+  margin-top: 14px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  text-align: center;
+}

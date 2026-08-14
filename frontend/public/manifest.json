@@ -1,0 +1,9 @@
+{
+  "name": "Boardroom",
+  "short_name": "Boardroom",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1c2333",
+  "theme_color": "#1c2333",
+  "icons": []
+}
