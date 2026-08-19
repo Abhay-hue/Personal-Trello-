@@ -85,7 +85,7 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <h1>Boardroom</h1>
+          <h1>HiAnkita Project Dash</h1>
           <div className="tagline">Tell it what happened. It'll handle the board.</div>
         </div>
         <div className="header-right">

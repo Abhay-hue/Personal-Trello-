@@ -1,26 +1,21 @@
-// Supabase Edge Function: ai-command  (FREE VERSION — uses Google Gemini)
+// Supabase Edge Function: ai-command  (FREE VERSION — uses Groq)
 //
 // Takes a plain-English sentence like:
 //   "new task: redesign the pricing page, assign to Sara, due Friday"
 //   "mark the pricing page task as done"
 //   "move the login bug to in progress and make it urgent"
-// and turns it into a database write, using Gemini (free tier) to interpret intent.
+// and turns it into a database write, using Groq's free tier to interpret intent.
 //
-// Get a free key (no credit card): https://aistudio.google.com/apikey
+// Get a free key (no credit card): https://console.groq.com -> API Keys
 //
 // Deploy:  supabase functions deploy ai-command
-// Secrets: supabase secrets set GEMINI_API_KEY=AIza...
-//
-// Note: this uses gemini-2.5-flash, which is on Google's free tier as of
-// August 2026. If Google changes free-tier model names later, swap the
-// model string below for whatever their current free Flash model is
-// (check https://ai.google.dev/gemini-api/docs/pricing).
+// Secrets: supabase secrets set GROQ_API_KEY=gsk_...
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY")!;
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -94,29 +89,30 @@ Rules:
 - Only match an existing task if you're reasonably confident which one is meant. Otherwise use "unknown".
 - Resolve people by first name, nickname, or email against the team list. If no clear match, leave assignee_id null.`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.2,
-          },
-        }),
-      }
-    );
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      throw new Error(`Gemini API error: ${errText}`);
+    if (!groqRes.ok) {
+      const errText = await groqRes.text();
+      throw new Error(`Groq API error: ${errText}`);
     }
 
-    const geminiData = await geminiRes.json();
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const groqData = await groqRes.json();
+    const rawText = groqData.choices?.[0]?.message?.content ?? "";
 
     let parsed;
     try {

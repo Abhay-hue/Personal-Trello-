@@ -1,24 +1,27 @@
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap");
 
 /* ---- Design tokens -------------------------------------------------
-   Concept: a small team's ticket board — cards read like torn ticket
-   stubs, with a numbered stub and a priority-coded spine.
-   Palette: cool slate surface, ink-navy header, muted teal brand accent,
-   warm amber/red reserved only for priority signal (so color carries
-   real meaning, not decoration).
+   HiAnkita Project Dash — warm, easy-on-the-eyes theme.
+   Soft neon orange as the primary brand color, lime green for
+   highlights/success states, hot pink reserved for standout accents
+   (high priority, special callouts) so it doesn't get overused.
 ------------------------------------------------------------------- */
 :root {
-  --ink: #171b26;
-  --ink-soft: #4a5164;
-  --surface: #eef1f6;
+  --ink: #3a2b22;
+  --ink-soft: #8a7364;
+  --surface: #fff8f2;
   --surface-card: #ffffff;
-  --line: #dbe0ea;
-  --brand: #2f7a6b;
-  --brand-soft: #e4f1ee;
-  --p-low: #8892a6;
-  --p-medium: #4b6bfb;
-  --p-high: #e08a3c;
-  --p-urgent: #d64545;
+  --line: #f3e2d3;
+  --brand: #ff8c42;
+  --brand-soft: #ffe8d6;
+  --lime: #a6e22e;
+  --lime-soft: #eef9d8;
+  --pink: #ff3ea5;
+  --pink-soft: #ffe1f0;
+  --p-low: #b8a99a;
+  --p-medium: #ff8c42;
+  --p-high: #ff3ea5;
+  --p-urgent: #e63946;
   --font-display: "Space Grotesk", sans-serif;
   --font-body: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
@@ -49,8 +52,8 @@ button {
 
 /* ---- Header ---- */
 .app-header {
-  background: var(--ink);
-  color: #f4f6fb;
+  background: #2b1b12;
+  color: #fff8f2;
   padding: 18px 28px;
   display: flex;
   align-items: center;
@@ -67,7 +70,7 @@ button {
 
 .app-header .tagline {
   font-size: 0.8rem;
-  color: #9aa3ba;
+  color: #c9a68c;
   margin-top: 2px;
 }
 
@@ -78,9 +81,9 @@ button {
 }
 
 .pill-btn {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f4f6fb;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff8f2;
+  border: 1px solid rgba(255, 140, 66, 0.4);
   border-radius: 999px;
   padding: 7px 14px;
   font-size: 0.82rem;
@@ -88,7 +91,8 @@ button {
   transition: background 0.15s ease;
 }
 .pill-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--brand);
+  border-color: var(--brand);
 }
 
 .avatar {
@@ -126,6 +130,7 @@ button {
   font-family: var(--font-body);
   outline: none;
   transition: border-color 0.15s ease;
+  background: var(--surface);
 }
 .command-input:focus {
   border-color: var(--brand);
@@ -160,12 +165,12 @@ button {
   max-width: 880px;
 }
 .command-feedback.ok {
-  background: var(--brand-soft);
-  color: #205448;
+  background: var(--lime-soft);
+  color: #4b6b12;
 }
 .command-feedback.err {
-  background: #fbe7e7;
-  color: #93231f;
+  background: var(--pink-soft);
+  color: #a3125f;
 }
 
 /* ---- Board ---- */
@@ -233,12 +238,12 @@ button {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   padding: 14px 16px 14px 18px;
-  box-shadow: 0 1px 2px rgba(23, 27, 38, 0.04);
+  box-shadow: 0 1px 2px rgba(58, 43, 34, 0.05);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .task-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(23, 27, 38, 0.08);
+  box-shadow: 0 6px 16px rgba(58, 43, 34, 0.1);
 }
 
 .task-card::before {
@@ -294,16 +299,16 @@ button {
   font-family: var(--font-mono);
   padding: 3px 8px;
   border-radius: 6px;
-  background: #f1f3f8;
-  color: var(--ink-soft);
+  background: var(--brand-soft);
+  color: #a35314;
 }
 .task-due.soon {
-  background: #fdf1e2;
-  color: #8a5a17;
+  background: var(--pink-soft);
+  color: #a3125f;
 }
 .task-due.overdue {
-  background: #fbe7e7;
-  color: #93231f;
+  background: #ffd8d8;
+  color: #b3261e;
 }
 
 .task-assignee {
@@ -337,8 +342,9 @@ button {
   cursor: pointer;
 }
 .status-actions button:hover {
-  border-color: var(--brand);
-  color: var(--brand);
+  border-color: var(--lime);
+  background: var(--lime-soft);
+  color: #4b6b12;
 }
 
 /* ---- Login ---- */
@@ -347,7 +353,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ink);
+  background: #2b1b12;
 }
 
 .login-card {
@@ -363,6 +369,7 @@ button {
   font-family: var(--font-display);
   font-size: 1.4rem;
   margin: 0 0 4px;
+  color: var(--brand);
 }
 
 .login-card p {
