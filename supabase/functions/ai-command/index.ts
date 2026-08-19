@@ -13,6 +13,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders } from "../_shared/cors.ts";
+import { sendEmail, sendPushToUser } from "../_shared/notify.ts";
 
 const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY")!;
 const GROQ_MODEL = "openai/gpt-oss-120b";
@@ -93,7 +94,10 @@ Pick ONE action shape based on the sentence:
 7. Add or remove a task from the pinned SOP column (use this for "make this an SOP", "pin this to SOP", "take this out of SOP", etc):
 {"action":"set_sop","task_id":"<uuid>","is_sop":true|false}
 
-8. If the sentence is ambiguous, refers to a task you cannot confidently match, or isn't board-related:
+8. Send an appreciation/shoutout message to a teammate (use this for "tell Sara great job", "give Rajat a shoutout for the design", "thank Priya for the writeup", etc). Resolve the person by name against the team list:
+{"action":"send_appreciation","to_member_id":"<uuid>","message":"<short, warm, specific to what they did>"}
+
+9. If the sentence is ambiguous, refers to a task you cannot confidently match, or isn't board-related:
 {"action":"unknown","reason":"<short explanation to show the user>"}
 
 Rules:
@@ -196,7 +200,14 @@ Rules:
       case "set_deadline": {
         const { data, error } = await supabase
           .from("tasks")
-          .update({ due_date: parsed.due_date, reminder_sent: false, overdue_notified: false })
+          .update({
+            due_date: parsed.due_date,
+            reminder_24h_sent: false,
+            reminder_12h_sent: false,
+            reminder_6h_sent: false,
+            reminder_2h_sent: false,
+            overdue_notified: false,
+          })
           .eq("id", parsed.task_id)
           .select()
           .single();
@@ -229,6 +240,25 @@ Rules:
         resultMessage = parsed.is_sop
           ? `Pinned "${data.title}" to the SOP column.`
           : `Removed "${data.title}" from the SOP column.`;
+        break;
+      }
+      case "send_appreciation": {
+        const { data: toMember } = await supabase
+          .from("team_members")
+          .select("id, name, email")
+          .eq("id", parsed.to_member_id)
+          .single();
+        if (!toMember) throw new Error("Couldn't find that teammate.");
+
+        await supabase.from("appreciations").insert({
+          from_member: user.id,
+          to_member: toMember.id,
+          message: parsed.message,
+        });
+        await sendEmail(toMember.email, "You got a shoutout! 🎉", `<p>${parsed.message}</p>`);
+        await sendPushToUser(supabase, toMember.id, "You got a shoutout! 🎉", parsed.message);
+
+        resultMessage = `Sent ${toMember.name} a shoutout.`;
         break;
       }
       case "delete_task": {

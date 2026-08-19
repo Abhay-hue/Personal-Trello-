@@ -1,11 +1,13 @@
 // Supabase Edge Function: send-deadline-reminders
 //
-// Run this on a schedule (Supabase Dashboard -> Edge Functions -> Cron,
-// or pg_cron - see README). Every run it:
-//   1. Emails + push-notifies anyone whose task is due within 24h
-//      (once per task).
-//   2. Emails + push-notifies anyone whose task is overdue
-//      (once per task).
+// Run this on a schedule (hourly, via pg_cron — see README). Every run it
+// checks each open task with a due date against 5 thresholds, and fires
+// each one exactly once as time crosses it:
+//   24h before -> 12h before -> 6h before -> 2h before -> overdue
+//
+// Threshold checks are monotonic ("has now passed this point AND haven't
+// sent it yet"), so this is safe even if the cron run is a few minutes
+// late or occasionally double-fires — nothing sends twice.
 //
 // Deploy:  supabase functions deploy send-deadline-reminders --no-verify-jwt
 // Secrets: supabase secrets set RESEND_API_KEY=re_...
@@ -15,83 +17,54 @@
 //          supabase secrets set APP_URL=https://yourname.github.io/pm-tool
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import webpush from "https://esm.sh/web-push@3.6.7";
+import { sendEmail, sendPushToUser } from "../_shared/notify.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
-const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
-const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@example.com";
-const APP_URL = Deno.env.get("APP_URL") || "";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-async function sendEmail(to: string, subject: string, html: string) {
-  if (!RESEND_API_KEY) return;
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: "Boardroom <onboarding@resend.dev>", // swap for your verified domain
-      to,
-      subject,
-      html,
-    }),
-  });
-}
-
-async function sendPush(userId: string, title: string, body: string) {
-  const { data: subs } = await supabase
-    .from("push_subscriptions")
-    .select("*")
-    .eq("user_id", userId);
-
-  for (const sub of subs || []) {
-    try {
-      await webpush.sendNotification(
-        sub.subscription,
-        JSON.stringify({ title, body, url: APP_URL })
-      );
-    } catch (err) {
-      // Subscription likely expired - clean it up.
-      if ((err as { statusCode?: number }).statusCode === 410) {
-        await supabase.from("push_subscriptions").delete().eq("id", sub.id);
-      }
-    }
-  }
-}
+// Ordered soonest-column-fires-first is irrelevant here — each tier is
+// independent — but listed largest-window to smallest for readability.
+const TIERS = [
+  { hours: 24, column: "reminder_24h_sent", label: "due in 24 hours" },
+  { hours: 12, column: "reminder_12h_sent", label: "due in 12 hours" },
+  { hours: 6, column: "reminder_6h_sent", label: "due in 6 hours" },
+  { hours: 2, column: "reminder_2h_sent", label: "due in 2 hours" },
+];
 
 Deno.serve(async () => {
   const now = new Date();
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  let tierNotifications = 0;
 
-  // --- Upcoming deadlines (due within 24h, not yet reminded) ---
-  const { data: upcoming } = await supabase
-    .from("tasks")
-    .select("*, team_members!tasks_assignee_id_fkey(id, name, email)")
-    .neq("status", "done")
-    .eq("reminder_sent", false)
-    .not("due_date", "is", null)
-    .lte("due_date", in24h.toISOString())
-    .gte("due_date", now.toISOString());
+  for (const tier of TIERS) {
+    const threshold = new Date(now.getTime() + tier.hours * 60 * 60 * 1000);
 
-  for (const task of upcoming || []) {
-    const assignee = task.team_members;
-    if (!assignee) continue;
-    const when = new Date(task.due_date).toLocaleString();
-    await sendEmail(
-      assignee.email,
-      `Due soon: ${task.title}`,
-      `<p><strong>${task.title}</strong> is due ${when}.</p><p>${task.description || ""}</p>`
-    );
-    await sendPush(assignee.id, "Deadline coming up", `${task.title} is due ${when}`);
-    await supabase.from("tasks").update({ reminder_sent: true }).eq("id", task.id);
+    const { data: due } = await supabase
+      .from("tasks")
+      .select("*, team_members!tasks_assignee_id_fkey(id, name, email)")
+      .neq("status", "done")
+      .eq(tier.column, false)
+      .not("due_date", "is", null)
+      .gte("due_date", now.toISOString())
+      .lte("due_date", threshold.toISOString());
+
+    for (const task of due || []) {
+      const assignee = task.team_members;
+      const when = new Date(task.due_date).toLocaleString();
+
+      if (assignee) {
+        await sendEmail(
+          assignee.email,
+          `Due soon: ${task.title}`,
+          `<p><strong>${task.title}</strong> is ${tier.label} (${when}).</p><p>${task.description || ""}</p>`
+        );
+        await sendPushToUser(supabase, assignee.id, "Deadline coming up", `${task.title} is ${tier.label}`);
+      }
+
+      await supabase.from("tasks").update({ [tier.column]: true }).eq("id", task.id);
+      tierNotifications++;
+    }
   }
 
   // --- Overdue (past due, not yet notified as overdue) ---
@@ -105,18 +78,19 @@ Deno.serve(async () => {
 
   for (const task of overdue || []) {
     const assignee = task.team_members;
-    if (!assignee) continue;
-    await sendEmail(
-      assignee.email,
-      `Overdue: ${task.title}`,
-      `<p><strong>${task.title}</strong> was due ${new Date(task.due_date).toLocaleString()} and is still open.</p>`
-    );
-    await sendPush(assignee.id, "Task overdue", `${task.title} is overdue`);
+    if (assignee) {
+      await sendEmail(
+        assignee.email,
+        `Overdue: ${task.title}`,
+        `<p><strong>${task.title}</strong> was due ${new Date(task.due_date).toLocaleString()} and is still open.</p>`
+      );
+      await sendPushToUser(supabase, assignee.id, "Task overdue", `${task.title} is overdue`);
+    }
     await supabase.from("tasks").update({ overdue_notified: true }).eq("id", task.id);
   }
 
   return new Response(
-    JSON.stringify({ upcoming: upcoming?.length || 0, overdue: overdue?.length || 0 }),
+    JSON.stringify({ tierNotifications, overdue: overdue?.length || 0 }),
     { headers: { "Content-Type": "application/json" } }
   );
 });

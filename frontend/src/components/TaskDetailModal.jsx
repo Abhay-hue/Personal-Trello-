@@ -124,7 +124,10 @@ export default function TaskDetailModal({ task, members, currentUserId, onClose,
           revision_count: revisionCount,
           is_sop: isSop,
           assignee_id: assigneeIds[0] || null, // keep legacy field in sync with first assignee
-          reminder_sent: false,
+          reminder_24h_sent: false,
+          reminder_12h_sent: false,
+          reminder_6h_sent: false,
+          reminder_2h_sent: false,
           overdue_notified: false,
         })
         .eq("id", task.id);
