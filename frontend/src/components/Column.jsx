@@ -1,6 +1,6 @@
 import TaskCard from "./TaskCard";
 
-export default function Column({ title, tasks, membersById, onStatusChange }) {
+export default function Column({ title, tasks, membersById, onStatusChange, onOpen }) {
   return (
     <div className="column">
       <div className="column-header">
@@ -15,6 +15,7 @@ export default function Column({ title, tasks, membersById, onStatusChange }) {
             task={task}
             assignee={task.assignee_id ? membersById[task.assignee_id] : null}
             onStatusChange={onStatusChange}
+            onOpen={onOpen}
           />
         ))}
       </div>

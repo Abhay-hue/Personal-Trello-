@@ -1,12 +1,14 @@
 import Column from "./Column";
 
 const COLUMNS = [
+  { key: "backlog", title: "Backlog" },
   { key: "todo", title: "To do" },
   { key: "in_progress", title: "In progress" },
+  { key: "review", title: "Review" },
   { key: "done", title: "Done" },
 ];
 
-export default function Board({ tasks, members, onStatusChange }) {
+export default function Board({ tasks, members, onStatusChange, onOpen }) {
   const membersById = Object.fromEntries(members.map((m) => [m.id, m]));
 
   return (
@@ -18,6 +20,7 @@ export default function Board({ tasks, members, onStatusChange }) {
           tasks={tasks.filter((t) => t.status === col.key)}
           membersById={membersById}
           onStatusChange={onStatusChange}
+          onOpen={onOpen}
         />
       ))}
     </div>

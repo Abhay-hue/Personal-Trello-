@@ -5,6 +5,7 @@ import Login from "./components/Login";
 import Board from "./components/Board";
 import AICommandBar from "./components/AICommandBar";
 import WorkspaceSwitcher from "./components/WorkspaceSwitcher";
+import TaskDetailModal from "./components/TaskDetailModal";
 
 function initials(name) {
   if (!name) return "?";
@@ -18,6 +19,7 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState([]);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState(null); // null = SOP view
   const [pushState, setPushState] = useState("default");
+  const [openTask, setOpenTask] = useState(null);
 
   // --- Auth ---
   useEffect(() => {
@@ -26,7 +28,6 @@ export default function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Make sure this person has a team_members row (name defaults to email prefix).
   useEffect(() => {
     if (!session) return;
     supabase
@@ -54,7 +55,6 @@ export default function App() {
     setWorkspaces(w || []);
   }, []);
 
-  // --- Data + realtime sync ---
   useEffect(() => {
     if (!session) return;
     loadData();
@@ -82,14 +82,11 @@ export default function App() {
     }
   }
 
-  if (session === undefined) return null; // brief loading flash
+  if (session === undefined) return null;
   if (!session) return <Login />;
 
   const me = members.find((m) => m.id === session.user.id);
 
-  // Tasks shown = tasks in the selected workspace, PLUS any SOP task
-  // (workspace_id is null AND is_sop is true) regardless of which
-  // workspace you're currently viewing.
   const visibleTasks = tasks
     .filter((t) => t.is_sop || t.workspace_id === currentWorkspaceId)
     .sort((a, b) => {
@@ -128,7 +125,21 @@ export default function App() {
       </header>
 
       <AICommandBar workspaceId={currentWorkspaceId} onHandled={loadData} />
-      <Board tasks={visibleTasks} members={members} onStatusChange={handleStatusChange} />
+      <Board
+        tasks={visibleTasks}
+        members={members}
+        onStatusChange={handleStatusChange}
+        onOpen={setOpenTask}
+      />
+
+      {openTask && (
+        <TaskDetailModal
+          task={openTask}
+          members={members}
+          onClose={() => setOpenTask(null)}
+          onSaved={loadData}
+        />
+      )}
     </div>
   );
 }

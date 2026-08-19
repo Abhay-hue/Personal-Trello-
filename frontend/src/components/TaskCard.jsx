@@ -6,8 +6,10 @@ const PRIORITY_COLORS = {
 };
 
 const STATUS_LABELS = {
+  backlog: "Backlog",
   todo: "To do",
   in_progress: "In progress",
+  review: "Review",
   done: "Done",
 };
 
@@ -33,12 +35,15 @@ function dueBadge(dueDate) {
   return { cls, label };
 }
 
-export default function TaskCard({ task, assignee, onStatusChange }) {
+export default function TaskCard({ task, assignee, onStatusChange, onOpen }) {
   const due = dueBadge(task.due_date);
   const nextStatuses = Object.keys(STATUS_LABELS).filter((s) => s !== task.status);
+  const cardStyle = {
+    "--priority-color": task.tag_color || PRIORITY_COLORS[task.priority],
+  };
 
   return (
-    <div className="task-card" style={{ "--priority-color": PRIORITY_COLORS[task.priority] }}>
+    <div className="task-card" style={cardStyle} onClick={() => onOpen(task)}>
       <div className="task-card-top">
         <div>
           <p className="task-title">{task.title}</p>
@@ -67,7 +72,11 @@ export default function TaskCard({ task, assignee, onStatusChange }) {
         )}
       </div>
 
-      <div className="status-actions">
+      {task.rating > 0 && (
+        <div className="task-rating">{"★".repeat(task.rating)}{"☆".repeat(5 - task.rating)}</div>
+      )}
+
+      <div className="status-actions" onClick={(e) => e.stopPropagation()}>
         {nextStatuses.map((s) => (
           <button key={s} onClick={() => onStatusChange(task.id, s)}>
             {STATUS_LABELS[s]}
