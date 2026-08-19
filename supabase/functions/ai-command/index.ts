@@ -13,7 +13,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { corsHeaders } from "../_shared/cors.ts";
-import { sendEmail, sendPushToUser } from "../_shared/notify.ts";
+import { notifyMember } from "../_shared/notify.ts";
 
 const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY")!;
 const GROQ_MODEL = "openai/gpt-oss-120b";
@@ -245,7 +245,7 @@ Rules:
       case "send_appreciation": {
         const { data: toMember } = await supabase
           .from("team_members")
-          .select("id, name, email")
+          .select("id, name, email, callmebot_phone, callmebot_apikey")
           .eq("id", parsed.to_member_id)
           .single();
         if (!toMember) throw new Error("Couldn't find that teammate.");
@@ -255,8 +255,7 @@ Rules:
           to_member: toMember.id,
           message: parsed.message,
         });
-        await sendEmail(toMember.email, "You got a shoutout! 🎉", `<p>${parsed.message}</p>`);
-        await sendPushToUser(supabase, toMember.id, "You got a shoutout! 🎉", parsed.message);
+        await notifyMember(supabase, toMember, "You got a shoutout! 🎉", parsed.message);
 
         resultMessage = `Sent ${toMember.name} a shoutout.`;
         break;

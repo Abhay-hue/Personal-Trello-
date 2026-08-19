@@ -70,18 +70,75 @@ export async function sendPushToUser(
   return { sent, cleaned };
 }
 
-// Push + email to every team member (used for team-wide pings).
+// --- WhatsApp via CallMeBot (free, personal-use only) ---
+// Only fires for team members who have both callmebot_phone and
+// callmebot_apikey set on their team_members row. Anyone else is
+// silently skipped — this is intentional, not an error.
+// Never throws: a failed/misconfigured WhatsApp send should never take
+// down the email/push notifications running alongside it.
+export async function sendWhatsApp(phone: string | null, apikey: string | null, text: string) {
+  if (!phone || !apikey) return { sent: false, reason: "not configured" };
+  try {
+    const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(
+      phone
+    )}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(apikey)}`;
+    const res = await fetch(url);
+    const bodyText = await res.text();
+    if (!res.ok) {
+      console.error(`CallMeBot send failed for ${phone}: ${res.status} ${bodyText}`);
+      return { sent: false, reason: `http ${res.status}` };
+    }
+    return { sent: true };
+  } catch (err) {
+    console.error(`CallMeBot send threw for ${phone}:`, err);
+    return { sent: false, reason: (err as Error).message };
+  }
+}
+
+// One member, all three channels: email + push + WhatsApp (if configured).
+// This is the one function everything else should call — it's the single
+// choke point for "notify this person," so every new channel we add later
+// (e.g. Phase 3 chat mentions) only needs to be wired in here once.
+export async function notifyMember(
+  supabase: ReturnType<typeof createClient>,
+  member: { id: string; email: string; callmebot_phone?: string | null; callmebot_apikey?: string | null },
+  title: string,
+  body: string
+) {
+  await sendEmail(member.email, title, `<p>${body}</p>`);
+  const push = await sendPushToUser(supabase, member.id, title, body);
+  const whatsapp = await sendWhatsApp(
+    member.callmebot_phone ?? null,
+    member.callmebot_apikey ?? null,
+    `*${title}*\n${body}`
+  );
+  return { push, whatsapp };
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Push + email + WhatsApp to every team member (used for team-wide pings).
+// Sends are staggered ~1.5s apart — CallMeBot is a single free personal
+// bot, not built for simultaneous bulk sends, so this avoids silent drops
+// when all 4 CallMeBot-enabled people get pinged in the same run.
 export async function notifyAllMembers(
   supabase: ReturnType<typeof createClient>,
   title: string,
   body: string
 ) {
-  const { data: members } = await supabase.from("team_members").select("id, email");
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("id, email, callmebot_phone, callmebot_apikey");
+
   let pushed = 0;
+  let whatsapped = 0;
   for (const m of members || []) {
-    await sendEmail(m.email, title, `<p>${body}</p>`);
-    const { sent } = await sendPushToUser(supabase, m.id, title, body);
-    pushed += sent;
+    const { push, whatsapp } = await notifyMember(supabase, m, title, body);
+    pushed += push.sent;
+    if (whatsapp.sent) whatsapped++;
+    await sleep(1500);
   }
-  return { members: members?.length || 0, pushed };
+  return { members: members?.length || 0, pushed, whatsapped };
 }

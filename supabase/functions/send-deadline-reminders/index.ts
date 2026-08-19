@@ -15,9 +15,11 @@
 //          supabase secrets set VAPID_PRIVATE_KEY=...
 //          supabase secrets set VAPID_SUBJECT=mailto:you@example.com
 //          supabase secrets set APP_URL=https://yourname.github.io/pm-tool
+// (WhatsApp needs no separate secret — CallMeBot keys live per-person on
+// the team_members row, see supabase/migrations/0003_callmebot.sql)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { sendEmail, sendPushToUser } from "../_shared/notify.ts";
+import { notifyMember } from "../_shared/notify.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -33,6 +35,9 @@ const TIERS = [
   { hours: 2, column: "reminder_2h_sent", label: "due in 2 hours" },
 ];
 
+const ASSIGNEE_SELECT =
+  "*, team_members!tasks_assignee_id_fkey(id, name, email, callmebot_phone, callmebot_apikey)";
+
 Deno.serve(async () => {
   const now = new Date();
   let tierNotifications = 0;
@@ -42,7 +47,7 @@ Deno.serve(async () => {
 
     const { data: due } = await supabase
       .from("tasks")
-      .select("*, team_members!tasks_assignee_id_fkey(id, name, email)")
+      .select(ASSIGNEE_SELECT)
       .neq("status", "done")
       .eq(tier.column, false)
       .not("due_date", "is", null)
@@ -54,12 +59,12 @@ Deno.serve(async () => {
       const when = new Date(task.due_date).toLocaleString();
 
       if (assignee) {
-        await sendEmail(
-          assignee.email,
+        await notifyMember(
+          supabase,
+          assignee,
           `Due soon: ${task.title}`,
-          `<p><strong>${task.title}</strong> is ${tier.label} (${when}).</p><p>${task.description || ""}</p>`
+          `${task.title} is ${tier.label} (${when}).`
         );
-        await sendPushToUser(supabase, assignee.id, "Deadline coming up", `${task.title} is ${tier.label}`);
       }
 
       await supabase.from("tasks").update({ [tier.column]: true }).eq("id", task.id);
@@ -70,7 +75,7 @@ Deno.serve(async () => {
   // --- Overdue (past due, not yet notified as overdue) ---
   const { data: overdue } = await supabase
     .from("tasks")
-    .select("*, team_members!tasks_assignee_id_fkey(id, name, email)")
+    .select(ASSIGNEE_SELECT)
     .neq("status", "done")
     .eq("overdue_notified", false)
     .not("due_date", "is", null)
@@ -79,12 +84,12 @@ Deno.serve(async () => {
   for (const task of overdue || []) {
     const assignee = task.team_members;
     if (assignee) {
-      await sendEmail(
-        assignee.email,
+      await notifyMember(
+        supabase,
+        assignee,
         `Overdue: ${task.title}`,
-        `<p><strong>${task.title}</strong> was due ${new Date(task.due_date).toLocaleString()} and is still open.</p>`
+        `${task.title} was due ${new Date(task.due_date).toLocaleString()} and is still open.`
       );
-      await sendPushToUser(supabase, assignee.id, "Task overdue", `${task.title} is overdue`);
     }
     await supabase.from("tasks").update({ overdue_notified: true }).eq("id", task.id);
   }
