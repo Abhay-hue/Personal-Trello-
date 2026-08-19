@@ -12,6 +12,12 @@ function initials(name) {
   return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 }
 
+function byDueDateAsc(a, b) {
+  if (!a.due_date) return 1;
+  if (!b.due_date) return -1;
+  return new Date(a.due_date) - new Date(b.due_date);
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = loading
   const [tasks, setTasks] = useState([]);
@@ -87,13 +93,13 @@ export default function App() {
 
   const me = members.find((m) => m.id === session.user.id);
 
-  const visibleTasks = tasks
-    .filter((t) => t.is_sop || t.workspace_id === currentWorkspaceId)
-    .sort((a, b) => {
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date) - new Date(b.due_date);
-    });
+  // SOP tasks are pinned in their own column and show no matter which
+  // workspace you're viewing. Everything else stays scoped to the
+  // current workspace, sorted so the soonest deadline floats to the top.
+  const sopTasks = tasks.filter((t) => t.is_sop).sort(byDueDateAsc);
+  const workspaceTasks = tasks
+    .filter((t) => !t.is_sop && t.workspace_id === currentWorkspaceId)
+    .sort(byDueDateAsc);
 
   return (
     <div className="app-shell">
@@ -126,7 +132,8 @@ export default function App() {
 
       <AICommandBar workspaceId={currentWorkspaceId} onHandled={loadData} />
       <Board
-        tasks={visibleTasks}
+        tasks={workspaceTasks}
+        sopTasks={sopTasks}
         members={members}
         onStatusChange={handleStatusChange}
         onOpen={setOpenTask}
@@ -136,6 +143,7 @@ export default function App() {
         <TaskDetailModal
           task={openTask}
           members={members}
+          currentUserId={session.user.id}
           onClose={() => setOpenTask(null)}
           onSaved={loadData}
         />

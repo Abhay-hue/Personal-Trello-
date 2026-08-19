@@ -5,14 +5,24 @@ const COLUMNS = [
   { key: "todo", title: "To do" },
   { key: "in_progress", title: "In progress" },
   { key: "review", title: "Review" },
+  { key: "repository", title: "Repository" },
   { key: "done", title: "Done" },
 ];
 
-export default function Board({ tasks, members, onStatusChange, onOpen }) {
+export default function Board({ tasks, sopTasks, members, onStatusChange, onOpen }) {
   const membersById = Object.fromEntries(members.map((m) => [m.id, m]));
 
   return (
     <div className="board">
+      <Column
+        key="sop"
+        title="SOP"
+        tasks={sopTasks}
+        membersById={membersById}
+        onStatusChange={onStatusChange}
+        onOpen={onOpen}
+        accent
+      />
       {COLUMNS.map((col) => (
         <Column
           key={col.key}

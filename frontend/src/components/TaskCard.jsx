@@ -10,6 +10,7 @@ const STATUS_LABELS = {
   todo: "To do",
   in_progress: "In progress",
   review: "Review",
+  repository: "Repository",
   done: "Done",
 };
 
@@ -46,7 +47,10 @@ export default function TaskCard({ task, assignee, onStatusChange, onOpen }) {
     <div className="task-card" style={cardStyle} onClick={() => onOpen(task)}>
       <div className="task-card-top">
         <div>
-          <p className="task-title">{task.title}</p>
+          <p className="task-title">
+            {task.is_sop && <span className="sop-badge" title="SOP task">SOP</span>}
+            {task.title}
+          </p>
           {task.description && <p className="task-desc">{task.description}</p>}
         </div>
         <span className="task-id">#{task.id.slice(0, 4).toUpperCase()}</span>

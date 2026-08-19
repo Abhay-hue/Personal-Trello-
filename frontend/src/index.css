@@ -238,6 +238,18 @@ button {
   background: transparent;
 }
 
+.column-accent .column-header h2 {
+  color: var(--lime, #a6e22e);
+}
+.column-accent .column-header::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lime, #a6e22e);
+  display: inline-block;
+}
+
 .column-header {
   display: flex;
   align-items: baseline;
@@ -496,6 +508,48 @@ button {
   padding: 0 14px;
   font-weight: 600;
   font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.resource-add {
+  flex-wrap: wrap;
+}
+.resource-add input:first-of-type {
+  flex: 0 0 140px;
+}
+.resource-link {
+  color: var(--brand, #4b6bfb);
+  text-decoration: none;
+  font-weight: 500;
+  word-break: break-all;
+}
+.resource-link:hover {
+  text-decoration: underline;
+}
+
+.sop-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: var(--lime, #a6e22e);
+  color: #2b1b12;
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.sop-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: -6px 0 12px;
+  cursor: pointer;
+}
+.sop-toggle input {
   cursor: pointer;
 }
 

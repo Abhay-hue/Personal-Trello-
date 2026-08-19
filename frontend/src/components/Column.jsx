@@ -1,8 +1,8 @@
 import TaskCard from "./TaskCard";
 
-export default function Column({ title, tasks, membersById, onStatusChange, onOpen }) {
+export default function Column({ title, tasks, membersById, onStatusChange, onOpen, accent }) {
   return (
-    <div className="column">
+    <div className={`column ${accent ? "column-accent" : ""}`}>
       <div className="column-header">
         <h2>{title}</h2>
         <span className="column-count">{tasks.length}</span>

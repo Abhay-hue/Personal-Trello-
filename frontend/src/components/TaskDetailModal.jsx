@@ -10,7 +10,7 @@ const TAG_COLORS = [
   { name: "Violet", value: "#9c6bff" },
 ];
 
-export default function TaskDetailModal({ task, members, onClose, onSaved }) {
+export default function TaskDetailModal({ task, members, currentUserId, onClose, onSaved }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
   const [priority, setPriority] = useState(task.priority);
@@ -18,9 +18,13 @@ export default function TaskDetailModal({ task, members, onClose, onSaved }) {
   const [dueDate, setDueDate] = useState(task.due_date ? task.due_date.slice(0, 16) : "");
   const [rating, setRating] = useState(task.rating || 0);
   const [revisionCount, setRevisionCount] = useState(task.revision_count || 0);
+  const [isSop, setIsSop] = useState(task.is_sop || false);
   const [assigneeIds, setAssigneeIds] = useState([]);
   const [checklist, setChecklist] = useState([]);
   const [newItemText, setNewItemText] = useState("");
+  const [links, setLinks] = useState([]);
+  const [newLinkTitle, setNewLinkTitle] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -38,6 +42,12 @@ export default function TaskDetailModal({ task, members, onClose, onSaved }) {
       .eq("task_id", task.id)
       .order("position")
       .then(({ data }) => setChecklist(data || []));
+    supabase
+      .from("resources")
+      .select("*")
+      .eq("task_id", task.id)
+      .order("created_at")
+      .then(({ data }) => setLinks(data || []));
   }, [task.id]);
 
   function toggleAssignee(id) {
@@ -74,6 +84,31 @@ export default function TaskDetailModal({ task, members, onClose, onSaved }) {
     setChecklist((prev) => prev.filter((i) => i.id !== item.id));
   }
 
+  async function addLink() {
+    if (!newLinkUrl.trim()) return;
+    const { data, error } = await supabase
+      .from("resources")
+      .insert({
+        task_id: task.id,
+        workspace_id: task.workspace_id || null,
+        title: newLinkTitle.trim() || newLinkUrl.trim(),
+        url: newLinkUrl.trim(),
+        added_by: currentUserId || null,
+      })
+      .select()
+      .single();
+    if (!error) {
+      setLinks((prev) => [...prev, data]);
+      setNewLinkTitle("");
+      setNewLinkUrl("");
+    }
+  }
+
+  async function deleteLink(link) {
+    await supabase.from("resources").delete().eq("id", link.id);
+    setLinks((prev) => prev.filter((l) => l.id !== link.id));
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -87,6 +122,7 @@ export default function TaskDetailModal({ task, members, onClose, onSaved }) {
           due_date: dueDate ? new Date(dueDate).toISOString() : null,
           rating: rating || null,
           revision_count: revisionCount,
+          is_sop: isSop,
           assignee_id: assigneeIds[0] || null, // keep legacy field in sync with first assignee
           reminder_sent: false,
           overdue_notified: false,
@@ -129,6 +165,11 @@ export default function TaskDetailModal({ task, members, onClose, onSaved }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
+
+        <label className="sop-toggle">
+          <input type="checkbox" checked={isSop} onChange={(e) => setIsSop(e.target.checked)} />
+          Keep this in the SOP column (always visible, in every workspace)
+        </label>
 
         <textarea
           className="modal-desc-input"
@@ -217,6 +258,36 @@ export default function TaskDetailModal({ task, members, onClose, onSaved }) {
               onKeyDown={(e) => e.key === "Enter" && addChecklistItem()}
             />
             <button onClick={addChecklistItem}>Add</button>
+          </div>
+        </div>
+
+        <div className="modal-field">
+          <label>Reference links {links.length > 0 && `(${links.length})`}</label>
+          <div className="checklist">
+            {links.map((link) => (
+              <div key={link.id} className="checklist-item">
+                <a href={link.url} target="_blank" rel="noreferrer" className="resource-link">
+                  {link.title || link.url}
+                </a>
+                <button className="checklist-delete" onClick={() => deleteLink(link)}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="checklist-add resource-add">
+            <input
+              placeholder="Label (optional)"
+              value={newLinkTitle}
+              onChange={(e) => setNewLinkTitle(e.target.value)}
+            />
+            <input
+              placeholder="Paste a link (PDF, Google Doc, Drive...)"
+              value={newLinkUrl}
+              onChange={(e) => setNewLinkUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addLink()}
+            />
+            <button onClick={addLink}>Add</button>
           </div>
         </div>
 

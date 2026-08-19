@@ -75,8 +75,8 @@ Pick ONE action shape based on the sentence:
 1. Create a task:
 {"action":"create_task","title":"...","description":"","priority":"low|medium|high|urgent","assignee_id":"<uuid or null>","due_date":"<ISO 8601 or null>"}
 
-2. Change a task's status (use this for "done", "mark complete", "move to in progress", "start working on", etc). Match to the closest existing task by title:
-{"action":"update_status","task_id":"<uuid>","status":"todo|in_progress|done"}
+2. Change a task's status (use this for "done", "mark complete", "move to in progress", "start working on", "move to review", "put in the repository", "back to backlog", etc). Match to the closest existing task by title:
+{"action":"update_status","task_id":"<uuid>","status":"backlog|todo|in_progress|review|repository|done"}
 
 3. Reassign a task:
 {"action":"assign_task","task_id":"<uuid>","assignee_id":"<uuid or null>"}
@@ -90,7 +90,10 @@ Pick ONE action shape based on the sentence:
 6. Delete/cancel a task:
 {"action":"delete_task","task_id":"<uuid>"}
 
-7. If the sentence is ambiguous, refers to a task you cannot confidently match, or isn't board-related:
+7. Add or remove a task from the pinned SOP column (use this for "make this an SOP", "pin this to SOP", "take this out of SOP", etc):
+{"action":"set_sop","task_id":"<uuid>","is_sop":true|false}
+
+8. If the sentence is ambiguous, refers to a task you cannot confidently match, or isn't board-related:
 {"action":"unknown","reason":"<short explanation to show the user>"}
 
 Rules:
@@ -212,6 +215,20 @@ Rules:
         if (error) throw error;
         task = data;
         resultMessage = `Set "${data.title}" to ${parsed.priority} priority.`;
+        break;
+      }
+      case "set_sop": {
+        const { data, error } = await supabase
+          .from("tasks")
+          .update({ is_sop: parsed.is_sop })
+          .eq("id", parsed.task_id)
+          .select()
+          .single();
+        if (error) throw error;
+        task = data;
+        resultMessage = parsed.is_sop
+          ? `Pinned "${data.title}" to the SOP column.`
+          : `Removed "${data.title}" from the SOP column.`;
         break;
       }
       case "delete_task": {
