@@ -4,6 +4,7 @@ import { enablePush, getPushPermissionState } from "./push";
 import Login from "./components/Login";
 import Board from "./components/Board";
 import AICommandBar from "./components/AICommandBar";
+import WorkspaceSwitcher from "./components/WorkspaceSwitcher";
 
 function initials(name) {
   if (!name) return "?";
@@ -14,6 +15,8 @@ export default function App() {
   const [session, setSession] = useState(undefined); // undefined = loading
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState(null); // null = SOP view
   const [pushState, setPushState] = useState("default");
 
   // --- Auth ---
@@ -41,12 +44,14 @@ export default function App() {
   }, [session]);
 
   const loadData = useCallback(async () => {
-    const [{ data: t }, { data: m }] = await Promise.all([
-      supabase.from("tasks").select("*").order("created_at", { ascending: false }),
+    const [{ data: t }, { data: m }, { data: w }] = await Promise.all([
+      supabase.from("tasks").select("*").order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("team_members").select("*"),
+      supabase.from("workspaces").select("*").order("name"),
     ]);
     setTasks(t || []);
     setMembers(m || []);
+    setWorkspaces(w || []);
   }, []);
 
   // --- Data + realtime sync ---
@@ -58,6 +63,7 @@ export default function App() {
       .channel("board-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "team_members" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "workspaces" }, loadData)
       .subscribe();
 
     return () => supabase.removeChannel(channel);
@@ -81,6 +87,17 @@ export default function App() {
 
   const me = members.find((m) => m.id === session.user.id);
 
+  // Tasks shown = tasks in the selected workspace, PLUS any SOP task
+  // (workspace_id is null AND is_sop is true) regardless of which
+  // workspace you're currently viewing.
+  const visibleTasks = tasks
+    .filter((t) => t.is_sop || t.workspace_id === currentWorkspaceId)
+    .sort((a, b) => {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date) - new Date(b.due_date);
+    });
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -89,6 +106,11 @@ export default function App() {
           <div className="tagline">Tell it what happened. It'll handle the board.</div>
         </div>
         <div className="header-right">
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            currentId={currentWorkspaceId}
+            onChange={setCurrentWorkspaceId}
+          />
           {pushState !== "granted" && pushState !== "unsupported" && (
             <button className="pill-btn" onClick={handleEnablePush}>
               Enable push alerts
@@ -105,8 +127,8 @@ export default function App() {
         </div>
       </header>
 
-      <AICommandBar onHandled={loadData} />
-      <Board tasks={tasks} members={members} onStatusChange={handleStatusChange} />
+      <AICommandBar workspaceId={currentWorkspaceId} onHandled={loadData} />
+      <Board tasks={visibleTasks} members={members} onStatusChange={handleStatusChange} />
     </div>
   );
 }

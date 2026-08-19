@@ -3,7 +3,7 @@ import { supabase } from "../supabaseClient";
 
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-command`;
 
-export default function AICommandBar({ onHandled }) {
+export default function AICommandBar({ workspaceId, onHandled }) {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null); // { ok: bool, message: string }
@@ -26,7 +26,7 @@ export default function AICommandBar({ onHandled }) {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, workspace_id: workspaceId }),
       });
 
       const data = await res.json();
@@ -47,7 +47,7 @@ export default function AICommandBar({ onHandled }) {
       <form className="command-form" onSubmit={handleSubmit}>
         <input
           className="command-input"
-          placeholder='Try: "new task: redesign the pricing page, assign to Sara, due Friday"'
+          placeholder='Try: "new task: redesign the pricing page, assign to Sara, due Friday" or "create a workspace for Acme Corp"'
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={loading}
@@ -57,8 +57,8 @@ export default function AICommandBar({ onHandled }) {
         </button>
       </form>
       <p className="command-hint">
-        You can also say things like "mark the pricing page task as done" or "make the login bug
-        urgent."
+        You can also say "mark the pricing page task as done," "make the login bug urgent," or
+        "create a workspace for [client name]."
       </p>
       {feedback && (
         <div className={`command-feedback ${feedback.ok ? "ok" : "err"}`}>{feedback.message}</div>

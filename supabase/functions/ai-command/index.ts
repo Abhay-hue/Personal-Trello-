@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     } = await userClient.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
-    const { text } = await req.json();
+    const { text, workspace_id } = await req.json();
     if (!text || typeof text !== "string") {
       throw new Error("Expected { text: string }");
     }
@@ -46,10 +46,14 @@ Deno.serve(async (req) => {
     const { data: members } = await supabase
       .from("team_members")
       .select("id, name, email");
+    const { data: workspaces } = await supabase
+      .from("workspaces")
+      .select("id, name");
     const { data: openTasks } = await supabase
       .from("tasks")
       .select("id, title, status, priority, due_date, assignee_id")
       .neq("status", "done")
+      .eq("workspace_id", workspace_id ?? null)
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -57,11 +61,16 @@ Deno.serve(async (req) => {
 You turn one sentence of plain English into a single JSON action. Reply with ONLY the JSON object, nothing else - no markdown fences, no commentary.
 
 Team members: ${JSON.stringify(members)}
-Open tasks (id, title, status, priority, due_date, assignee_id): ${JSON.stringify(openTasks)}
+Existing workspaces (clients): ${JSON.stringify(workspaces)}
+The person is currently viewing workspace_id: ${workspace_id ?? "null (SOP/no workspace selected)"}
+Open tasks in the CURRENT workspace only (id, title, status, priority, due_date, assignee_id): ${JSON.stringify(openTasks)}
 
 Today's date/time (UTC): ${new Date().toISOString()}
 
 Pick ONE action shape based on the sentence:
+
+0. Create a new workspace (use this when the sentence is about creating/starting/adding a new client or workspace, e.g. "create a workspace for Acme Corp", "new client: Acme"):
+{"action":"create_workspace","name":"..."}
 
 1. Create a task:
 {"action":"create_task","title":"...","description":"","priority":"low|medium|high|urgent","assignee_id":"<uuid or null>","due_date":"<ISO 8601 or null>"}
@@ -125,6 +134,19 @@ Rules:
     let task = null;
 
     switch (parsed.action) {
+      case "create_workspace": {
+        const { data, error } = await supabase
+          .from("workspaces")
+          .insert({ name: parsed.name, created_by: user.id })
+          .select()
+          .single();
+        if (error) throw error;
+        resultMessage = `Created workspace "${data.name}". Switch to it from the workspace menu.`;
+        return new Response(
+          JSON.stringify({ message: resultMessage, workspace: data, action: parsed.action }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       case "create_task": {
         const { data, error } = await supabase
           .from("tasks")
@@ -135,6 +157,7 @@ Rules:
             assignee_id: parsed.assignee_id || null,
             due_date: parsed.due_date || null,
             created_by: user.id,
+            workspace_id: workspace_id ?? null,
           })
           .select()
           .single();
